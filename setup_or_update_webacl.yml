@@ -1,0 +1,56 @@
+# Purpose:
+#        Create a web ACL and attach it with the rules
+
+# <<Input Parameters>>
+# required:   resource_type       =     ALB or CF (ALB= Application Load Balancer , CF= CloudFront)
+# required:   resource_name       =     Provide valid resource "Web ACL name"
+# required:   resource_region     =     Provide the resource region (Note: for CloudFront use us-east-1)
+# required:   selected_rules_list =     Provide the list of rules files applicable for ALB or CF i.e selected_rules_list=['../vars/custom_rules/cf_custom_ipv4spam_ip_list_rule.yaml','../vars/aws_managed_rules/aws_anonymous_ip_list_rule.yaml']"
+# Optional:   ipset_arn           =     Please provide this value if we intend to add the IPSet Rule for ALB or CF.
+
+# To run the playbook to create web acl for ALB
+# ansible-playbook web_acl/create_or_update_webacl_playbook.yaml -e "resource_type=ALB resource_region=us-east-1 resource_name=ALB_Name selected_rules_list=['../vars/custom_rules/cf_custom_ipv4spam_ip_list_rule.yaml','../vars/aws_managed_rules/aws_anonymous_ip_list_rule.yaml'] ipset_arn="
+
+# To run the playbook to create web acl for CF
+# ansible-playbook web_acl/create_or_update_webacl_playbook.yaml -e "resource_type=CF resource_region=us-east-1 resource_name=CF_ID selected_rules_list=['../vars/custom_rules/cf_custom_ipv4spam_ip_list_rule.yaml','../vars/aws_managed_rules/aws_anonymous_ip_list_rule.yaml'] ipset_arn="
+
+# Result
+# Note down the web acl arn and name
+---
+- name: Create or Update WAF Web ACL Playbook
+  hosts: localhost
+  gather_facts: no
+
+  tasks:
+    # validation
+    - name: Import tasks of resource name validation
+      include_tasks: ../validation/resource_name.yaml
+
+    - name: Import tasks of resource region validation
+      include_tasks: ../validation/resource_region.yaml
+
+    - name: Import tasks of resource type validation
+      include_tasks: ../validation/resource_type.yaml
+
+    # read the contents of yaml and converts into json
+    - name: Read rules from user inputs
+      include_vars:
+        file: '{{ item }}'
+      loop: '{{ selected_rules_list }}'
+      register: selected_rule_files
+
+    # Create or Update a Web ACL
+    - name: Create or Update Web ACL
+      community.aws.wafv2_web_acl:
+        name: '{{ resource_type }}_webacl_{{ resource_name }}'
+        scope: "{{ 'REGIONAL' if resource_type == 'ALB' else 'CLOUDFRONT' }}"
+        default_action: Allow
+        rules: "{{ selected_rule_files.results | map(attribute='ansible_facts') | list }}"
+        region: '{{ resource_region if resource_type == "ALB" else "us-east-1" }}'
+        state: present
+      register: web_acl_result
+
+    # 5 Output
+    - name: Result
+      debug:
+        msg: 'webacl_arn={{ web_acl_result.arn }} and resource_name={{ web_acl_result.name }}'
