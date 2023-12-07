@@ -1,0 +1,39 @@
+# Purpose:
+#        Delete a Web ACL
+#        Before deleting the Web ACL make sure it is not associated with any ALB or CF
+
+# <<Input Parameters>>
+# required:   resource_type     =     ALB or CF (ALB= Application Load Balancer , CF= CloudFront)
+# required:   resource_name     =     Provide valid resource "Web ACL name"
+# required:   resource_region   =     Provide the resource region (Note: for CloudFront use us-east-1)
+
+# To run the playbook for ALB resource to delete
+# ansible-playbook web_acl/delete_webacl_playbook.yaml -e "resource_type=ALB resource_region=us-east-1 resource_name=ALB_webACL_Name"
+
+# To run the playbook for CF resource to delete
+# ansible-playbook web_acl/delete_webacl_playbook.yaml -e "resource_type=CF resource_region=us-east-1 resource_name=CF_webACL_Name"
+---
+- name: Delete WAF Web ACL
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Import tasks of resource name validation
+      include_tasks: ../validation/resource_name.yaml
+
+    - name: Import tasks of resource region validation
+      include_tasks: ../validation/resource_region.yaml
+
+    - name: Import tasks of resource type validation
+      include_tasks: ../validation/resource_type.yaml
+
+    - name: Delete Web ACL
+      community.aws.wafv2_web_acl:
+        name: '{{ resource_name }}'
+        scope: "{{ 'REGIONAL' if resource_type == 'ALB' else 'CLOUDFRONT' }}"
+        region: '{{ resource_region if resource_type == "ALB" else "us-east-1" }}'
+        state: 'absent'
+      register: web_acl_delete_result
+
+    - name: Result
+      debug:
+        var: web_acl_delete_result
