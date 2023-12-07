@@ -1,0 +1,34 @@
+# Purpose:
+#         Get the details of Web ACL
+
+# <<Input Parameters>>
+# required:   resource_type   =   ALB or CF (ALB= Application Load Balancer , CF= CloudFront)
+# required:   resource_name   =   provide valid "Web ACL name"
+# required:   resource_region =   Provide the resource region (Note: for CloudFront use us-east-1)
+
+# To run the playbook get the WEB ACL details for ALB
+# ansible-playbook web_acl/get_webacl_info_playbook.yaml -e "resource_type=ALB resource_region=us-east-1 resource_name=ALB_WebAcl_Name"
+
+# To run the playbook get the WEB ACL details for CF
+# Please ensure that 'resource_region' is set to 'us-east-1' when using CF, as it is primarily designed to operate from the US-East-1 region according to AWS specifications; otherwise, the code will generate an error.
+
+# ansible-playbook web_acl/get_webacl_info_playbook.yaml -e "resource_type=CF  resource_region=us-east-1 resource_name=CF_WebAcl_Name"
+
+# Result
+# Note down the webacl arn and name
+---
+- name: Get Info Of Web Acl Playbook
+  hosts: localhost
+  gather_facts: no
+
+  tasks:
+    - name: Get Web Acl details
+      community.aws.wafv2_web_acl_info:
+        name: '{{ resource_name }}'
+        scope: '{{ "REGIONAL" if resource_type == "ALB" else "CLOUDFRONT" }}'
+        region: '{{ resource_region if resource_type == "ALB" else "us-east-1" }}'
+      register: get_webacl_info
+
+    - name: Result
+      debug:
+        msg: 'webacl_arn ={{ get_webacl_info.arn }} and resource_name = {{ get_webacl_info.name }}'
